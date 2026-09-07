@@ -1,66 +1,140 @@
-# AI-CA3-Categorize-Articles-of-Digitala-Mag-Using-Classifier-Bayes-Naive
+# Persian Article Classifier
 
-## Project No. 3: Working with Naive Bayes Classifier
+Categorises Persian magazine articles by topic using a multinomial naive Bayes
+classifier built from scratch: bag-of-words counts, additive smoothing, and log
+probabilities. Four categories, covering art and cinema, health and beauty,
+science and technology, and video games.
 
-### Introduction
-In this project, our goal is to analyze articles from the Digitala Mag site using the Naive Bayes Classifier, categorize them, and predict their classification based on the description of each article.
+![Per-category F1 with and without additive smoothing](docs/smoothing.png)
 
-### Import Libraries and Define Constants
-We import 'hazm' for data preprocessing and use the 'stop_words' function from 'farsi_tools' to ignore Persian stop words.
+## Requirements
 
-### Phase One: Data Preprocessing
-We use 'sent_tokenize' to separate sentences and 'word_tokenize' for word tokenization. We choose 'lemmatizer' for getting past and present roots of verbs since it's more accurate than stemming.
+Python 3.10 or later. The classifier has no third-party dependencies; the figure needs matplotlib. The
+optional `--hazm` flag needs [hazm](https://github.com/roshan-research/hazm) for
+Persian normalisation and lemmatisation.
 
-**Stop Words:**  
-Stop words are generated from 'chars.txt' and the 'stop_words()' function in 'farsi_tools'. We create a set of stop words.
+## Installation
 
-### Phase Two: Problem Process
-We add an alpha value to the formula to avoid zero probabilities for words that may not appear in the training set but appear in the test set. We use the formula: `np.log((LABEL.get(token, 0) + alpha) / (LABEL_total_words + (alpha * LABEL_distinct_words)))` instead of `np.log(LABEL[token] / LABEL_total_words)`, with alpha set to 1.
+```bash
+pip install -e .
+```
 
-**Train the Model:**  
-We create dictionaries for each category (e.g., art_and_cinema, science_and_tech) to count the occurrence of tokens in each category.
+With hazm and the test suite:
 
-**Posterior:** The probability of a test article with word count evidence calculated in the training set.
+```bash
+pip install -e ".[persian,dev]"
+```
 
-**Likelihood:** The probability of a word appearing in respective training articles.
+## Usage
 
-**Class Prior:** The probability of an article belonging to a category.
+```bash
+python -m naive_bayes.cli --train data/train.csv --test data/test.csv
+```
 
-**Predictor Prior:** The probability of words appearing in articles calculated according to every article in the training set.
+Both CSVs need a `content` column of article text and a `label` column of
+category. `data/test.csv` holds the 801-article evaluation set; the training
+corpus is not redistributed here, so supply your own `data/train.csv` in the same
+format. `data/punctuation.txt` is a punctuation list usable with `--stop-words`.
 
-### Bigrams
-Bigrams consider the words before and after the current word, helping to differentiate between words with multiple meanings. For example, 'سیر' can mean 'not hungry' or 'garlic.' Bigrams can recognize phrases like 'سیر خراب' and determine the intended meaning based on context.
+Useful flags:
 
-### Additive Smoothing
-Without additive smoothing, if a word is only present in articles related to one category (e.g., video games) and not in other categories (e.g., science and technology), the model may incorrectly classify any article containing that word as related to video games. Additive smoothing helps avoid zero probabilities and biases, making the model more robust.
+| flag | effect |
+| --- | --- |
+| `--alpha` | Smoothing pseudo-count. `0` disables smoothing entirely |
+| `--hazm` | Tokenise and lemmatise with hazm instead of the built-in splitter |
+| `--stop-words` | Path to a stop word list, one per line |
+| `--top-tokens N` | Also print the N most frequent tokens in each category |
 
-We add an alpha value to the formula to avoid zero probabilities for words not in the training set but present in the test set. The formula becomes: `np.log((LABEL.get(token, 0) + alpha) / (LABEL_total_words + (alpha * LABEL_distinct_words)))`.
+Redraw the figure above from the recorded scores:
 
-### Phase Three: Evaluation 
-Precision and Recall are not enough because they focus on different aspects of model performance.
+```python
+from pathlib import Path
+from naive_bayes.figures import smoothing_comparison
 
-- Precision measures what proportion of predicted positives are truly positive. It is essential when false positives are costly. High precision means fewer false positives.
-- Recall measures what proportion of actual positives is correctly classified. It is crucial when false negatives are costly. High recall means fewer false negatives.
+smoothing_comparison(Path("results/recorded_metrics.json"), Path("docs/smoothing.png"))
+```
 
-For example:
-- In a medical test, high recall ensures that actual patients are correctly identified. However, high precision ensures that healthy individuals are not wrongly diagnosed.
-- Conversely, in spam email detection, high precision ensures that legitimate emails are not classified as spam, while high recall ensures that most spam emails are detected.
+## Results
 
-Both precision and recall are necessary to assess a model comprehensively, considering the specific problem and its associated costs.
+| | accuracy | macro F1 |
+| --- | --- | --- |
+| without smoothing | 93.14% | 93.07% |
+| additive smoothing, alpha = 1 | 95.89% | 95.88% |
 
-**Probabilities without Additive Smoothing:**
-- **Precision:**
-    - هنر و سینما: 95.35%
-    - سلامت و زیبایی: 95.03%
-    - علم و تکنولوژی: 95.36%
-    - بازی ویدیویی: 97.88%
-- **Recall:**
-    - هنر و سینما: 98.20%
-    - سلامت و زیبایی: 95.03%
-    - علم و تکنولوژی: 96.39%
-    - بازی ویدیویی: 93.91%
-- **F1-score:**
-    - هنر و سینما: 96.76%
-    - سلامت و زیبایی: 95.03%
-    - علم و تکنولوژی: 95.87%
-    - بازی ویدیویی: 95.85%
+Smoothing is worth 2.75 points of accuracy here, and the reason is structural
+rather than incidental. Class scores are sums of log probabilities, so a single
+token that never appeared in a class during training sends that class's score to
+negative infinity. One unseen word rules the class out no matter how strongly
+every other word in the article points at it. A pseudo-count of one gives every
+token in every class a small non-zero probability, which turns an absent word
+into weak evidence instead of a veto.
+
+Per class, with smoothing:
+
+| category | precision | recall | F1 |
+| --- | --- | --- | --- |
+| art and cinema | 95.35% | 98.20% | 96.76% |
+| health and beauty | 95.03% | 95.03% | 95.03% |
+| science and technology | 95.36% | 96.39% | 95.87% |
+| video games | 97.88% | 93.91% | 95.85% |
+
+Every category gains, and the largest gain lands where the classifier was
+weakest: health and beauty rises 3.8 points of F1, art and cinema 3.2. The full
+scores are in `results/recorded_metrics.json`.
+
+## Method
+
+**Tokenising.** Lemmatisation rather than stemming, because Persian verbs carry
+tense in affixes and a stemmer truncates those into strings that are not words.
+Stop words and the zero-width non-joiner are stripped, along with bare digits and
+single characters.
+
+**Scoring.** For each class, the log prior plus the sum of smoothed log
+likelihoods over the tokens present in the vocabulary. The evidence term is
+identical across classes for a given document, so it cannot change the ranking
+and is not computed. Tokens absent from the vocabulary are skipped rather than
+penalised, since an unknown word says nothing about which class an article
+belongs to.
+
+**Evaluating.** Precision and recall are reported per class and neither is
+sufficient alone: a model reaches perfect recall by predicting one class for
+everything, and high precision by predicting it almost never. Macro averaging
+gives a rare class the same weight as a common one; weighted averaging does not.
+For single-label classification the micro average collapses to accuracy, since
+every error is simultaneously one false positive and one false negative.
+
+## Project structure
+
+```
+naive_bayes/
+    preprocessing.py  tokenising, stop words, cleaning
+    model.py          the classifier: fitting, smoothing, scoring
+    metrics.py        per-class and averaged scores
+    cli.py            corpus loading and command dispatch
+    figures.py        the smoothing comparison chart
+tests/                tokenising, fitting, smoothing and metric tests
+data/                 evaluation corpus and a punctuation list
+docs/                 figures referenced by this README
+results/              recorded scores behind the tables above
+pyproject.toml        dependencies and optional extras
+```
+
+## Components
+
+| module | responsibility |
+| --- | --- |
+| `preprocessing` | Text to tokens, with an optional Persian NLP backend |
+| `model` | Counts, priors, smoothed likelihoods, prediction |
+| `metrics` | Precision, recall, F1, and the three averaging modes |
+| `cli` | Reads the corpus, runs the pipeline, prints the report |
+| `figures` | Draws the comparison chart from recorded scores |
+
+## Testing
+
+```bash
+python -m pytest tests/
+```
+
+Fifteen tests covering tokenising, cleaning, fitting, smoothing behaviour at
+alpha zero and one, unknown-token handling, and every metric including the case
+where macro and weighted averages diverge. Nothing external is required.

@@ -1,0 +1,18 @@
+{
+  "note": "Scores from a training run on the full corpus, per category and averaged.",
+  "categories": ["art and cinema", "health and beauty", "science and technology", "video games"],
+  "without_smoothing": {
+    "accuracy": 93.14,
+    "macro_f1": 93.07,
+    "precision": [88.30, 88.82, 95.47, 98.88],
+    "recall": [99.40, 93.79, 91.34, 89.85],
+    "f1": [93.52, 91.24, 93.36, 94.15]
+  },
+  "additive_smoothing_alpha_1": {
+    "accuracy": 95.89,
+    "macro_f1": 95.88,
+    "precision": [95.35, 95.03, 95.36, 97.88],
+    "recall": [98.20, 95.03, 96.39, 93.91],
+    "f1": [96.76, 95.03, 95.87, 95.85]
+  }
+}
